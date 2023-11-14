@@ -1,2 +1,4 @@
 ﻿
-var reader = new DebReader.DebReader();
+using ArxOne.Debian;
+
+var reader = new DebReader();
