@@ -6,8 +6,8 @@ internal class PartialReadStream : Stream
     private readonly long _start;
     private long _position;
 
-    public override bool CanRead { get; }
-    public override bool CanSeek { get; }
+    public override bool CanRead => true;
+    public override bool CanSeek => _stream.CanSeek;
     public override bool CanWrite => false;
     public override long Length { get; }
 
@@ -22,28 +22,37 @@ internal class PartialReadStream : Stream
         _stream = stream;
         Length = length;
         _start = stream.CanSeek ? stream.Position : 0;
-        Position = 0;
+        _position = 0;
     }
 
     public override void Flush()
     {
+        throw new NotSupportedException();
     }
 
     public override int Read(byte[] buffer, int offset, int count)
     {
-        var remaining = (int)Math.Min(count, Length - Position);
+        var remaining = (int)Math.Min(count, Length - _position);
         if (remaining == 0)
             return 0;
         var bytesRead = _stream.Read(buffer, offset, remaining);
-        Position += bytesRead;
+        _position += bytesRead;
         return bytesRead;
     }
 
     public override long Seek(long offset, SeekOrigin origin)
     {
-        if(!CanSeek)
+        if (!CanSeek)
             throw new NotSupportedException();
-        throw new NotImplementedException();
+        _position = Math.Min(Length, Math.Max(0, origin switch
+        {
+            SeekOrigin.Begin => offset,
+            SeekOrigin.Current => _position + offset,
+            SeekOrigin.End => Length + offset,
+            _ => throw new ArgumentOutOfRangeException(nameof(origin), origin, null)
+        }));
+        _stream.Position = _position + _start;
+        return _position;
     }
 
     public override void SetLength(long value)
