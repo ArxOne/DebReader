@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "TestApplication": {
+      "commandName": "Project",
+      "workingDirectory": "C:\\Users\\pascal\\Desktop"
+    }
+  }
+}
