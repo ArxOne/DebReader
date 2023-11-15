@@ -15,13 +15,21 @@ public class ArReader
 
     private static readonly byte[] FileHeaderEnding = "`\n"u8.ToArray();
 
-    public ArEntry? GetNextEntry()
+    public ArEntry? GetNextEntry(bool copyData = false)
     {
         var arEntry = ReadHeader();
         if (arEntry is null)
             return null;
         using var stream = new PartialReadStream(_inputStream, arEntry.Length, (int?)(arEntry.Length % 2));
-        arEntry.DataStream = stream;
+        if (copyData)
+        {
+            var memoryStream = new MemoryStream();
+            stream.CopyTo(memoryStream);
+            memoryStream.Position = 0;
+            arEntry.DataStream = memoryStream;
+        }
+        else
+            arEntry.DataStream = stream;
         return arEntry;
     }
 
