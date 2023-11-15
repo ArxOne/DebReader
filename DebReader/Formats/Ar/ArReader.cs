@@ -15,24 +15,6 @@ public class ArReader
 
     private static readonly byte[] FileHeaderEnding = "`\n"u8.ToArray();
 
-    public ArEntry? GetNextEntry(bool copyData = false)
-    {
-        var arEntry = ReadHeader();
-        if (arEntry is null)
-            return null;
-        using var stream = new PartialReadStream(_inputStream, arEntry.Length, (int?)(arEntry.Length % 2));
-        if (copyData)
-        {
-            var memoryStream = new MemoryStream();
-            stream.CopyTo(memoryStream);
-            memoryStream.Position = 0;
-            arEntry.DataStream = memoryStream;
-        }
-        else
-            arEntry.DataStream = stream;
-        return arEntry;
-    }
-
     public ArReader(Stream inputStream)
     {
         _inputStream = inputStream;
@@ -40,6 +22,28 @@ public class ArReader
         inputStream.ReadAll(header, 0, header.Length);
         if (!header.SequenceEqual(Header))
             throw new FormatException("Not an ar stream");
+    }
+
+    public IEnumerable<ArEntry> GetEntries(bool copyData = false)
+    {
+        for (; ; )
+        {
+            var arEntry = ReadHeader();
+            if (arEntry is null)
+                yield break;
+            using var stream = new PartialReadStream(_inputStream, arEntry.Length, (int?)(arEntry.Length % 2));
+            if (copyData)
+            {
+                var memoryStream = new MemoryStream();
+                stream.CopyTo(memoryStream);
+                memoryStream.Position = 0;
+                arEntry.DataStream = memoryStream;
+            }
+            else
+                arEntry.DataStream = stream;
+
+            yield return arEntry;
+        }
     }
 
     private ArEntry? ReadHeader()

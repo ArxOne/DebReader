@@ -4,10 +4,10 @@ namespace ArxOne.Debian.IO;
 
 internal class PartialReadStream : Stream
 {
+    private readonly long _start;
+    private long _position = 0;
     private readonly Stream _stream;
     private readonly int? _disposePadding;
-    private readonly long _start;
-    private long _position;
 
     public override bool CanRead => true;
     public override bool CanSeek => _stream.CanSeek;
@@ -24,9 +24,8 @@ internal class PartialReadStream : Stream
     {
         _stream = stream;
         _disposePadding = disposePadding;
-        Length = length;
         _start = stream.CanSeek ? stream.Position : 0;
-        _position = 0;
+        Length = length;
     }
 
     protected override void Dispose(bool disposing)
