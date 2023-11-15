@@ -3,48 +3,26 @@ using System.Text;
 using ArxOne.Debian.IO;
 using ArxOne.Debian.Utility;
 
-namespace ArxOne.Debian;
+namespace ArxOne.Debian.Formats.Ar;
 
 // https://en.wikipedia.org/wiki/Ar_(Unix)
-
-public interface IArEntry
-{
-    string FileName { get; }
-}
 
 public class ArReader
 {
     private readonly Stream _inputStream;
 
-    private static readonly byte[] Header =
-    {
-        (byte) '!', (byte) '<', (byte) 'a', (byte) 'r', (byte) 'c', (byte) 'h', (byte) '>', (byte) '\n'
-    };
+    private static readonly byte[] Header = "!<arch>\n"u8.ToArray();
 
-    private static readonly byte[] FileHeaderEnding = new byte[] { 0x60, 0x0A };
+    private static readonly byte[] FileHeaderEnding = "`\n"u8.ToArray();
 
-    private sealed record FileHeader : IArEntry
+    public ArEntry? GetNextEntry()
     {
-        public string FileIdentifier { get; init; }
-        public long FileModificationTimestamp { get; init; }
-        public long OwnerID { get; init; }
-        public long GroupID { get; init; }
-        public string FileMode { get; init; }
-        public long FileSize { get; init; }
-        public byte[] Ending { get; init; }
-        public string FileName => FileIdentifier;
-    }
-
-    public IEnumerable<(IArEntry Entry, Stream ContentStream)> ReadContent()
-    {
-        for (; ; )
-        {
-            var fileHeader = ReadHeader();
-            if (fileHeader is null)
-                yield break;
-            using var stream = new PartialReadStream(_inputStream, fileHeader.FileSize, (int?)(fileHeader.FileSize % 2));
-            yield return (fileHeader, stream);
-        }
+        var arEntry = ReadHeader();
+        if (arEntry is null)
+            return null;
+        using var stream = new PartialReadStream(_inputStream, arEntry.Length, (int?)(arEntry.Length % 2));
+        arEntry.DataStream = stream;
+        return arEntry;
     }
 
     public ArReader(Stream inputStream)
@@ -56,19 +34,19 @@ public class ArReader
             throw new FormatException("Not an ar stream");
     }
 
-    private FileHeader? ReadHeader()
+    private ArEntry? ReadHeader()
     {
         var fileIdentifier = ReadString(16);
         if (fileIdentifier is null)
             return null;
-        var fileHeader = new FileHeader
+        var fileHeader = new ArEntry
         {
-            FileIdentifier = fileIdentifier.TrimEnd('/'),
-            FileModificationTimestamp = ReadLong(12),
-            OwnerID = ReadLong(6),
-            GroupID = ReadLong(6),
-            FileMode = ReadString(8),
-            FileSize = ReadLong(10),
+            Name = fileIdentifier.TrimEnd('/'),
+            ModificationTimestamp = ReadLong(12),
+            Uid = ReadLong(6),
+            Gid = ReadLong(6),
+            Mode = ReadString(8),
+            Length = ReadLong(10),
             Ending = ReadBytes(2)
         };
         if (fileHeader.Ending is null || !fileHeader.Ending.SequenceEqual(FileHeaderEnding))
