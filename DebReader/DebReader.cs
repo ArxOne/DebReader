@@ -1,5 +1,9 @@
-﻿using System.Formats.Tar;
+﻿using System;
+using System.Collections.Generic;
+using System.Formats.Tar;
+using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Text;
 using ArxOne.Debian.Formats.Ar;
 using ArxOne.Debian.Utility;
@@ -111,6 +115,9 @@ public class DebReader
 
     private static bool IfMatch(ArEntry entry, string expectedName, Action<Stream> action)
     {
+        if (entry.DataStream is null)
+            return false;
+
         if (entry.Name == expectedName)
         {
             action(entry.DataStream);

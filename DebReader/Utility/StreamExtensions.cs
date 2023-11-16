@@ -1,4 +1,6 @@
-﻿namespace ArxOne.Debian.Utility;
+﻿using System.IO;
+
+namespace ArxOne.Debian.Utility;
 
 internal static class StreamExtensions
 {

@@ -1,4 +1,8 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
 using System.Text;
 using ArxOne.Debian.IO;
 using ArxOne.Debian.Utility;
@@ -51,13 +55,12 @@ public class ArReader
         var fileIdentifier = ReadString(16);
         if (fileIdentifier is null)
             return null;
-        var fileHeader = new ArEntry
+        var fileHeader = new ArEntry(fileIdentifier.TrimEnd('/'))
         {
-            Name = fileIdentifier.TrimEnd('/'),
             ModificationTimestamp = ReadLong(12),
             Uid = ReadLong(6),
             Gid = ReadLong(6),
-            Mode = ReadString(8),
+            Mode = ReadString(8) ?? throw new FormatException("Unexpected end of stream on int read"),
             Length = ReadLong(10),
             Ending = ReadBytes(2)
         };

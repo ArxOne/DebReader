@@ -1,4 +1,5 @@
-﻿using System.Formats.Tar;
+﻿using System.Collections.Generic;
+using System.Formats.Tar;
 
 namespace ArxOne.Debian.Utility;
 
