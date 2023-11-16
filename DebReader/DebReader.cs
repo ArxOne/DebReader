@@ -56,8 +56,11 @@ public class DebReader
         var controlEntry = tarReader.GetEntries().FirstOrDefault(e => e.GetCleanName() == "control");
         if (controlEntry?.DataStream is null)
             throw new FormatException("No control file found");
-        using var controlReader = new StreamReader(controlEntry.DataStream);
-        foreach (var (key, values) in ReadKeyValues(controlReader))
+        using var controlStreamReader = new StreamReader(controlEntry.DataStream);
+        var controlText = controlStreamReader.ReadToEnd();
+        fields[""] = controlText;
+        using var controlTextReader = new StringReader(controlText);
+        foreach (var (key, values) in ReadKeyValues(controlTextReader))
             fields[key] = string.Join(Environment.NewLine, values);
         control = fields.AsReadOnly();
     }
