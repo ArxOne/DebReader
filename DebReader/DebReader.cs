@@ -16,27 +16,37 @@ namespace ArxOne.Debian;
 
 public class DebReader
 {
+    private readonly Encoding _stanzaEncoding;
     private readonly ArReader _arReader;
 
-    public DebReader(Stream inputStream)
+    public DebReader(Stream inputStream, Encoding stanzaEncoding)
     {
+        _stanzaEncoding = stanzaEncoding;
         _arReader = new ArReader(inputStream);
     }
 
-    public (IReadOnlyDictionary<string, string> Control, IReadOnlyCollection<string> Files) Read()
+    public (IReadOnlyDictionary<string, string> Control, IReadOnlyCollection<string> Files) Read(bool readControl = true, bool readFiles = true)
     {
         IReadOnlyDictionary<string, string>? control = null;
         IReadOnlyCollection<string>? files = null;
         foreach (var entry in _arReader.GetEntries())
         {
             _ = IfMatch(entry, "debian-binary", ReadDebianBinary)
-                || IfMatch(entry, "control.tar", stream => ReadControlTar(stream, out control))
-                || IfMatch(entry, "data.tar", stream => ReadDataTar(stream, out files));
+                || IfMatch(entry, "control.tar", delegate (Stream stream)
+                {
+                    if (readControl)
+                        ReadControlTar(stream, out control);
+                })
+                || IfMatch(entry, "data.tar", delegate (Stream stream)
+                {
+                    if (readFiles)
+                        ReadDataTar(stream, out files);
+                });
         }
 
-        if (control is null)
+        if (control is null && readControl)
             throw new FormatException("No control found");
-        if (files is null)
+        if (files is null && readFiles)
             throw new FormatException("No data.tar found");
         return (control, files);
     }
@@ -49,14 +59,14 @@ public class DebReader
             throw new NotSupportedException($"Unsupported package version: {version}");
     }
 
-    private static void ReadControlTar(Stream inputStream, out IReadOnlyDictionary<string, string>? control)
+    private void ReadControlTar(Stream inputStream, out IReadOnlyDictionary<string, string>? control)
     {
         var fields = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
         using var tarReader = new TarReader(inputStream);
         var controlEntry = tarReader.GetEntries().FirstOrDefault(e => e.GetCleanName() == "control");
         if (controlEntry?.DataStream is null)
             throw new FormatException("No control file found");
-        using var controlStreamReader = new StreamReader(controlEntry.DataStream);
+        using var controlStreamReader = new StreamReader(controlEntry.DataStream, _stanzaEncoding);
         var controlText = controlStreamReader.ReadToEnd();
         fields[""] = controlText;
         using var controlTextReader = new StringReader(controlText);
