@@ -25,9 +25,10 @@ public class DebReader
         _arReader = new ArReader(inputStream);
     }
 
-    public (IReadOnlyDictionary<string, string> Control, IReadOnlyCollection<string> Files) Read(bool readControl = true, bool readFiles = true)
+    public (IReadOnlyDictionary<string, string>? Control, byte[]? RawControl, IReadOnlyCollection<string>? Files) Read(bool readControl = true, bool readFiles = true)
     {
         IReadOnlyDictionary<string, string>? control = null;
+        byte[]? rawControl = null;
         IReadOnlyCollection<string>? files = null;
         foreach (var entry in _arReader.GetEntries())
         {
@@ -35,7 +36,7 @@ public class DebReader
                 || IfMatch(entry, "control.tar", delegate (Stream stream)
                 {
                     if (readControl)
-                        ReadControlTar(stream, out control);
+                        ReadControlTar(stream, out control, out rawControl);
                 })
                 || IfMatch(entry, "data.tar", delegate (Stream stream)
                 {
@@ -48,7 +49,7 @@ public class DebReader
             throw new FormatException("No control found");
         if (files is null && readFiles)
             throw new FormatException("No data.tar found");
-        return (control, files);
+        return (control, rawControl, files);
     }
 
     private static void ReadDebianBinary(Stream inputStream)
@@ -59,14 +60,17 @@ public class DebReader
             throw new NotSupportedException($"Unsupported package version: {version}");
     }
 
-    private void ReadControlTar(Stream inputStream, out IReadOnlyDictionary<string, string>? control)
+    private void ReadControlTar(Stream inputStream, out IReadOnlyDictionary<string, string>? control, out byte[] rawControl)
     {
         var fields = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
         using var tarReader = new TarReader(inputStream);
         var controlEntry = tarReader.GetEntries().FirstOrDefault(e => e.GetCleanName() == "control");
         if (controlEntry?.DataStream is null)
             throw new FormatException("No control file found");
-        using var controlStreamReader = new StreamReader(controlEntry.DataStream, _stanzaEncoding);
+        var memoryStream = new MemoryStream();
+        controlEntry.DataStream.CopyTo(memoryStream);
+        rawControl = memoryStream.ToArray();
+        using var controlStreamReader = new StreamReader(new MemoryStream(rawControl), _stanzaEncoding);
         var controlText = controlStreamReader.ReadToEnd();
         fields[""] = controlText;
         using var controlTextReader = new StringReader(controlText);
@@ -157,5 +161,18 @@ public class DebReader
             "bzip2" => new BZip2Stream(inputStream, SharpCompress.Compressors.CompressionMode.Decompress, true),
             _ => throw new NotSupportedException($"Unsupported extension {compressionType}")
         };
+    }
+
+    public static byte[]? GetRawControl(string debFilePath)
+    {
+        using var debFileStream = File.OpenRead(debFilePath);
+        return GetRawControl(debFileStream);
+    }
+
+    public static byte[]? GetRawControl(Stream debFileStream)
+    {
+        var debReader = new DebReader(debFileStream, new ASCIIEncoding());
+        var (_, rawControl, _) = debReader.Read(readFiles: false);
+        return rawControl;
     }
 }
