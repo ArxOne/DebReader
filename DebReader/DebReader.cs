@@ -64,11 +64,9 @@ public class DebReader
     {
         var fields = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
         using var tarReader = new TarReader(inputStream);
-        var controlEntry = tarReader.GetEntries().FirstOrDefault(e => e.GetCleanName() == "control");
-        if (controlEntry?.DataStream is null)
-            throw new FormatException("No control file found");
+        var controlEntry = ReadControlEntry(tarReader);
         var memoryStream = new MemoryStream();
-        controlEntry.DataStream.CopyTo(memoryStream);
+        controlEntry.DataStream!.CopyTo(memoryStream);
         rawControl = memoryStream.ToArray();
         using var controlStreamReader = new StreamReader(new MemoryStream(rawControl), _stanzaEncoding);
         var controlText = controlStreamReader.ReadToEnd();
@@ -77,6 +75,21 @@ public class DebReader
         foreach (var (key, values) in ReadKeyValues(controlTextReader))
             fields[key] = string.Join(Environment.NewLine, values);
         control = fields.AsReadOnly();
+    }
+
+    private static TarEntry ReadControlEntry(TarReader tarReader)
+    {
+        try
+        {
+            var controlEntry = tarReader.GetEntries().FirstOrDefault(e => e.GetCleanName() == "control");
+            if (controlEntry?.DataStream is null)
+                throw new FormatException("No control file found");
+            return controlEntry;
+        }
+        catch (EndOfStreamException)
+        {
+            throw new FormatException("No control file found (tar empty");
+        }
     }
 
     private static IEnumerable<(string Key, IReadOnlyList<string> Values)> ReadKeyValues(TextReader controlReader)
