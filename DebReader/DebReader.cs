@@ -171,7 +171,7 @@ public class DebReader
         {
             "gzip" or "gz" => new GZipStream(inputStream, CompressionMode.Decompress),
             "xz" => new XZStream(inputStream),
-            "bzip2" => new BZip2Stream(inputStream, SharpCompress.Compressors.CompressionMode.Decompress, true),
+            "bzip2" => BZip2Stream.Create(inputStream, SharpCompress.Compressors.CompressionMode.Decompress, true),
             _ => throw new NotSupportedException($"Unsupported extension {compressionType}")
         };
     }
